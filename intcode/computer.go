@@ -129,3 +129,7 @@ func (c *Computer) Input() Input {
 func (c *Computer) OnOutput(outputFunc func(int)) {
 	c.outputFunc = outputFunc
 }
+
+func (c *Computer) Halted() bool {
+	return c.GetValue(c.pointer) == 99
+}
