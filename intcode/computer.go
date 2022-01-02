@@ -3,10 +3,10 @@ package intcode
 import "fmt"
 
 type Computer struct {
-	pointer, paramModes int
-	memory              []int
-	input               Input
-	outputFunc          func(int)
+	pointer, paramModes, base int
+	memory                    []int
+	input                     Input
+	outputFunc                func(int)
 }
 
 func NewComputer(program []int) *Computer {
@@ -26,18 +26,18 @@ func (c *Computer) Execute() {
 		case 1:
 			acc := c.readArgument(c.pointer + 1)
 			acc += c.readArgument(c.pointer + 2)
-			c.SetValue(c.GetValue(c.pointer+3), acc)
+			c.writeArgument(c.pointer+3, acc)
 			c.pointer += 4
 
 		case 2:
 			acc := c.readArgument(c.pointer + 1)
 			acc *= c.readArgument(c.pointer + 2)
-			c.SetValue(c.GetValue(c.pointer+3), acc)
+			c.writeArgument(c.pointer+3, acc)
 			c.pointer += 4
 
 		case 3:
 			if v, ok := c.input.Read(); ok {
-				c.SetValue(c.GetValue(c.pointer+1), v)
+				c.writeArgument(c.pointer+1, v)
 				c.pointer += 2
 			} else {
 				return
@@ -72,9 +72,9 @@ func (c *Computer) Execute() {
 			arg1 := c.readArgument(c.pointer + 1)
 			arg2 := c.readArgument(c.pointer + 2)
 			if arg1 < arg2 {
-				c.SetValue(c.GetValue(c.pointer+3), 1)
+				c.writeArgument(c.pointer+3, 1)
 			} else {
-				c.SetValue(c.GetValue(c.pointer+3), 0)
+				c.writeArgument(c.pointer+3, 0)
 			}
 
 			c.pointer += 4
@@ -83,12 +83,17 @@ func (c *Computer) Execute() {
 			arg1 := c.readArgument(c.pointer + 1)
 			arg2 := c.readArgument(c.pointer + 2)
 			if arg1 == arg2 {
-				c.SetValue(c.GetValue(c.pointer+3), 1)
+				c.writeArgument(c.pointer+3, 1)
 			} else {
-				c.SetValue(c.GetValue(c.pointer+3), 0)
+				c.writeArgument(c.pointer+3, 0)
 			}
 
 			c.pointer += 4
+
+		case 9:
+			offset := c.readArgument(c.pointer + 1)
+			c.base += offset
+			c.pointer += 2
 
 		case 99:
 			return
@@ -109,16 +114,39 @@ func (c *Computer) readArgument(address int) int {
 	case 1:
 		return c.GetValue(address)
 
+	case 2:
+		return c.GetValue(c.GetValue(address) + c.base)
+
 	default:
 		panic(fmt.Sprintf("invalid parameter mode %d", paramMode))
 	}
 }
 
+func (c *Computer) writeArgument(address, value int) {
+	paramMode := c.paramModes % 10
+	c.paramModes /= 10
+	switch paramMode {
+	case 0:
+		c.SetValue(c.GetValue(address), value)
+
+	case 2:
+		c.SetValue(c.GetValue(address)+c.base, value)
+	}
+}
+
 func (c *Computer) GetValue(address int) int {
+	if address >= len(c.memory) {
+		return 0
+	}
+
 	return c.memory[address]
 }
 
 func (c *Computer) SetValue(address, value int) {
+	for address >= len(c.memory) {
+		c.memory = append(c.memory, 0)
+	}
+
 	c.memory[address] = value
 }
 
